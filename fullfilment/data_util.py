@@ -1,167 +1,100 @@
-#!/usr/bin/env python
-# coding: utf-8
 
-# In[10]:
-
-
-import re
-import json
-import nltk
-import string
 import numpy as np
+import nltk
+import random
+import string,json
 from os.path import abspath, exists
-#nltk.download()
-from nltk.corpus import stopwords 
-################################
-################################
-##########INPUT TESTING################
-input="find chicken noodles"
-##############################
-#############################
-############################
-input="elder seating"
-######################
-input="car parking"
-###################
-input="near mrt"
-#############################
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
+class Hawker:
+    def __init__(self):
+        self.jsondata=json.load(open('data.json'))
+        self.preprocess(self.jsondata)
+        self.TfidfVec = TfidfVectorizer(tokenizer=self.LemNormalize, stop_words='english')
+    def preprocess(self,jsondata):
+        self.sent_tokens=[]
+        for j in self.jsondata:
+            for key,value in j.items():
+                self.sent_tokens.append(value)
+        self.word_tokens = nltk.word_tokenize(','.join(self.sent_tokens))
+        self.lemmer = nltk.stem.WordNetLemmatizer()
+    def LemTokens(self,tokens):
+        return [self.lemmer.lemmatize(token) for token in tokens] 
+    def LemNormalize(self,text):
+        remove_punct_dict = dict((ord(punct), None) for punct in string.punctuation)
+        return self.LemTokens(nltk.word_tokenize(text.lower().translate(remove_punct_dict)))
+    def getHawkersbyLocation(self,location):
+        actualNames=[]
+        # for hawker in hawkerNames:
+        for hc in self.jsondata:
+            sent_tokens=[]
+            for key,value in hc.items():
+                if(key=='DESCRIPTION_MYENV'):
+                    sent_tokens.extend(nltk.sent_tokenize(value))
+                else:
+                    sent_tokens.append(value)  
+            sent_tokens.append(location)        
+            # TfidfVec = TfidfVectorizer(tokenizer=self.LemNormalize, stop_words='english')
+            tfidf = self.TfidfVec.fit_transform(sent_tokens)
+            vals = cosine_similarity(tfidf[-1], tfidf)
+            idx=vals.argsort()[0][-2]
+            flat = vals.flatten()
+            flat.sort()
+            req_tfidf = flat[-2]   
+            if req_tfidf!=0:                    
+                actualNames.append(hc['NAME'])
+            if(len(actualNames)>4):
+                break    
+        return actualNames
 
-remove_punct_dict = dict((ord(punct), None) for punct in string.punctuation)
-stop_words = set(stopwords.words('english')) 
-print("here")
-a=[]
-b=[]
-c=[]
-l=[]
+    def getHawkerDetails(self,hawker_name,key):
+        # actualName=self.filterHawkerNames([hawker_name])[0]
+        hawker_details=[hc for hc in self.jsondata if hc['NAME']==hawker_name][0]
+        if(key in hawker_details):
+            return hawker_details[key]
+        else:
+            return -1
+    def getHawkerDetailsFromDescription(self,hawker_name,key):
+        HCs=[hc for hc in self.jsondata if hawker_name.lower() in hc['NAME'].lower()]
+        for hc in HCs:
+            sent_tokens=nltk.sent_tokenize(hc['DESCRIPTION_MYENV'])  
+            sent_tokens.append(key)           
+            # TfidfVec = TfidfVectorizer(tokenizer=self.LemNormalize, stop_words='english')
+            tfidf = self.TfidfVec.fit_transform(sent_tokens)
+            vals = cosine_similarity(tfidf[-1], tfidf)
+            idx=vals.argsort()[0][-2]
+            flat = vals.flatten()
+            flat.sort()
+            req_tfidf = flat[-2]              
+            if req_tfidf!=0:
+                return sent_tokens[idx]
+            else:
+                continue
+        return -1    
+    def searchHawker(self,query):
+        result=[]
+        for hc in self.jsondata:
+            sent_tokens=[]
+            for key,value in hc.items():
+                sent_tokens.append(value)
+            sent_tokens.append(query)
 
-
-with open(abspath("data.json"), mode="r", encoding="UTF-8") as json_file:
-            data_objs = json.loads(json_file.readlines())
-hawker_objs = data_objs
-score=[]
-i=0
-for hawker_item in hawker_objs["Hawker List"]:
-            a.append([])
-            b.append([])
-            c.append([hawker_item["NAME"]])
-            score.append([])
-            y=""
-            x=hawker_item["DESCRIPTION"]
-            if("DESCRIPTION_MYENV" in hawker_item):
-                y = hawker_item["DESCRIPTION_MYENV"]
-            z=x+ " \n"+y+" \n"
-            sent_tokens = [token for token in re.split('\n|,|[.]',z) if token != ""]
-            j=0
-               
-            for stoken in sent_tokens:
-                    score[i].append(0)
-                    b[i].append(stoken)
-                    t= nltk.word_tokenize(stoken.lower().translate(remove_punct_dict))
-                    a[i].append([])
-                    
-                    
-                    
-                    for wtoken in t:
-                        if not wtoken in stop_words:
-                            a[i][j].append(wtoken.lower())
-                            
-                            
-                        
-                   
-                    j=j+1
-            i=i+1
-                    
-
-#print(score) 
-#print(score[0][2])
-
-q=[]
-t= nltk.word_tokenize(input)
-for wtoken in t:
-                        if not wtoken in stop_words:
-                            q.append(wtoken.lower())
-qwe=0          
-#print(a)
-i=0
-max_i=0
-max_j=0
-max_score=0
-#print(q)
-for l1 in a:
-    j=0
-    for l2 in l1:
-        k=0
-        score_index=[]
-        for l3 in l2:
-            
-            #print(l3)
-           # print(len(a),len(l1),len(l2),len(l3))
-            for wtoken in q:
-                #print(wtoken)
-                #print(score[i][j])
-                if(wtoken==l3):
-                   # print(score[i][j])
-                   
-                    score[i][j]=score[i][j]+1
-                    #print(wtoken)
-                   
-                    score_index.append(k)
-                    continue
-                   
-                    
-            #print(score[i][j])     
-            k=k+1
-        if ( score_index!=[]):
-            #print("hello")
-            score[i][j]=score[i][j]-np.var(score_index)/50
-        if(score[i][j]>max_score):
-            max_score=score[i][j]
-            max_i=i
-            max_j=j
-          
-        j=j+1
-    i=i+1
-    
-#print(score)
-print(max_score)
-print(max_i)
-print(max_j)
-print(b[max_i][max_j])
-print(c[max_i])
-                    
-                    
-
-                    
-                
-            #l.append(x+ " \n"+y+" \n")
-#file2 = open("C:/Users/abhin/Downloads/myfile2.txt","w")    
-#file2.writelines(l) 
-#file2.close()
-            
+            # TfidfVec = TfidfVectorizer(tokenizer=self.LemNormalize, stop_words='english')
+            tfidf = self.TfidfVec.fit_transform(sent_tokens)
+            vals = cosine_similarity(tfidf[-1], tfidf)
+            idx=vals.argsort()[0][-2]
+            flat = vals.flatten()
+            flat.sort()
+            req_tfidf = flat[-2]   
+            if req_tfidf!=0:
+                result.append({'score':req_tfidf,'name':hc['NAME'],'sent':sent_tokens[idx]}) 
+        if(len(result)!=0):        
+            maxIndx=np.argmax(np.array([r['score'] for r in result]))
+            return {'name':result[maxIndx]['name'],'sent':result[maxIndx]['sent']}   
+        else:
+            return -1     
         
-#f=open('C:/Users/abhin/Downloads/myfile2.txt','r')
-        
-        #print("here 6")
-        #print(len(self.raw))
-#raw=f.read()# converts to lowercase
-#raw=raw.lower()
-#print(raw)
-#self.word_tokens = nltk.word_tokenize(self.raw)
-        
-#sent_tokens = [token for token in re.split('\n|,|[.]',raw) if token != ""]
-#word_tokens = nltk.word_tokenize(sent_tokens)
-#print(sent_tokens)
-#p=[]
-#for stoken in sent_tokens:
-    #print(stoken)
-    #if(stoken!=''):
-       # p.append(stoken)
-    
-#print(p)
-
-
-# In[ ]:
 
 
 
