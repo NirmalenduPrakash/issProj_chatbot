@@ -5,7 +5,6 @@ import os
 import requests
 from data_util import Hawker
 from googlesearch import search
-from util import *
 
 app = Flask(__name__)
 app.secret_key = os.urandom(12)
@@ -55,15 +54,20 @@ def main():
             deliveryurl=r                             
         resp={"fulfillmentText":deliveryurl} 
     elif intent_name == "get_hawker_details":
-        hawker_name= req["queryResult"]["parameters"]["hawkerName"]
+        hawker_name= req["queryResult"]["parameters"]["hawkerName"]        
         session['parameter']= req["queryResult"]["parameters"] 
-        actual_name=haw.getHawkersbyLocation(hawker_name)
-        if(len(actual_name)!=0):
-            actual_name=actual_name[0]
-            session['hawkercentre']=actual_name
-            resp_text=f"did you mean {actual_name} ?" 
-        else:
-            resp_text='Hawker centre not found'         
+        if(hawker_name==''):
+            print(session['hawkercentre']) 
+            resp_text = getHawkerIntentHandler(haw,session['hawkercentre'],session['parameter'])
+        else:    
+            actual_name=haw.getHawkersbyLocation(hawker_name)
+            if(len(actual_name)!=0):
+                actual_name=actual_name[0]
+                session['hawkercentre']=actual_name
+                resp_text=f"did you mean {actual_name} ?" 
+            else:
+                resp_text='Hawker centre not found'  
+                  
         resp={"fulfillmentText":resp_text}  
     elif intent_name=="get_hawker_details - yes":
         resp_text = getHawkerIntentHandler(haw,session['hawkercentre'],session['parameter'])
